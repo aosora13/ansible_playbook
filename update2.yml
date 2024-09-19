@@ -1,5 +1,5 @@
 ---
-- hosts: 192.168.1.224
+- hosts: 100.76.188.100
   become: true
   become_user: root
   tasks:
