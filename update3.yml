@@ -1,5 +1,5 @@
 ---
-- hosts: 35.211.80.0
+- hosts: 35.211.80.0,35.207.27.53
   become: true
   become_user: root
   tasks:
