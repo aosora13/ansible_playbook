@@ -1,5 +1,5 @@
 ---
-- hosts: 35.211.80.0
+- hosts: bitgcp
   become: true
   become_user: root
   tasks:
