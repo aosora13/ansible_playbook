@@ -1,5 +1,5 @@
 ---
-- hosts: bitgcp
+- hosts: bitgcp,bitgcp2
   become: true
   become_user: root
   tasks:
