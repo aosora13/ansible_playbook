@@ -1,9 +1,61 @@
 ---
-- hosts: oracle
-  become: true
-  become_user: root
+- name: Upgrade Oracle Linux systems in OCI
+  hosts: oracle
+  become: yes
+  vars:
+    reboot_after_upgrade: no  # Set to 'yes' for automatic reboots if needed
+    upgrade_timeout: 1800     # Timeout for package operations (in seconds)
+    exclude_packages:         # List packages to exclude (e.g., kernel-uek if stability is critical)
+      - "kernel-uek"
+      - "oraclelinux-release-el*"
+
   tasks:
-    - name: Upgrade All Packages RHEL
+    - name: Verify Oracle Linux distribution
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == 'OracleLinux'
+        fail_msg: "This playbook only supports Oracle Linux."
+
+    - name: Clean up yum/dnf cache (free space in OCI)
       ansible.builtin.yum:
-      name: '*'
-      state: latest
+        clean: all
+      ignore_errors: yes  # Continue even if cleanup fails
+
+    - name: Update all packages (exclude kernel-uek if specified)
+      ansible.builtin.yum:
+        name: '*'
+        state: latest
+        exclude: "{{ exclude_packages }}"
+        update_cache: yes
+        timeout: "{{ upgrade_timeout }}"
+      register: upgrade_result
+
+    - name: Check if reboot is needed (Oracle Linux-specific)
+      ansible.builtin.shell:
+        cmd: |
+          if [ -f /var/run/reboot-required ]; then
+            echo "reboot-needed"
+          else
+            needs-restarting -r || echo "reboot-needed"
+          fi
+      register: reboot_check
+      changed_when: false
+      ignore_errors: yes
+      when: reboot_after_upgrade == 'yes'
+
+    - name: Reboot if required (for kernel/OCI-specific updates)
+      ansible.builtin.reboot:
+        msg: "Rebooting after Oracle Linux updates"
+        connect_timeout: 30
+        reboot_timeout: 600
+        pre_reboot_delay: 15
+        post_reboot_delay: 30
+      when:
+        - reboot_after_upgrade == 'yes'
+        - "'reboot-needed' in reboot_check.stdout"
+
+    - name: Print summary
+      ansible.builtin.debug:
+        msg:
+          - "Upgrade completed. Changed: {{ upgrade_result.changed }}"
+          - "Reboot status: {{ ('reboot-needed' in reboot_check.stdout) | ternary('Required', 'Not needed') }}"
