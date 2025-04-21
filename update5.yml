@@ -1,6 +1,6 @@
 ---
 - name: Update Oracle Linux Systems
-  hosts: 132.145.145.198
+  hosts: oracle
   gather_facts: false  # Disable automatic fact gathering
   become: yes
 
