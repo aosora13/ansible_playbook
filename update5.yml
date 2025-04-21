@@ -1,19 +1,46 @@
 ---
-- name: Update Oracle Linux Systems
+- name: Oracle Linux Package Management
   hosts: oracle
   gather_facts: false  # Disable automatic fact gathering
-  become: yes
+  become: true
+  become_method: sudo
+  become_user: root
 
   tasks:
+    # 1. First ensure Python works (critical for all modules)
+    - name: Verify Python availability
+      raw: |
+        python3 -c 'import json; print(json.dumps({"success": true}))' || 
+        python -c 'import json; print(json.dumps({"success": true}))'
+      register: python_test
+      changed_when: false
+      ignore_errors: yes
+
+    # 2. Install Python if missing (Oracle Linux specific)
+    - name: Install Python 3
+      raw: |
+        if ! command -v python3 >/dev/null; then
+          if grep -q 'release 8' /etc/oracle-release; then
+            sudo dnf install -y python39
+            sudo alternatives --set python /usr/bin/python3
+          elif grep -q 'release 7' /etc/oracle-release; then
+            sudo yum install -y python3
+          fi
+        fi
+      when: python_test.failed
+      args:
+        executable: /bin/bash
+
+    # 3. Manually set package manager for Oracle Linux
+    - name: Set package manager facts
+      set_fact:
+        ansible_pkg_mgr: "{{ 'dnf' if ansible_distribution_major_version == '8' else 'yum' }}"
+      when: ansible_distribution == 'OracleLinux'
+
+    # 4. Now run package operations
     - name: Update all packages
-      dnf:
+      package:
         name: '*'
         state: latest
-        update_cache: yes
-      when: ansible_facts is defined
-
-    - name: Clean up packages
-      dnf:
-        autoremove: yes
-        clean: all
-      when: ansible_facts is defined
+      vars:
+        ansible_pkg_mgr: "{{ ansible_pkg_mgr | default('dnf') }}"
