@@ -1,50 +1,16 @@
 ---
-- name: Update system packages and configure Python interpreter
+- name: Update Oracle VM Servers
   hosts: oracle
   become: yes
   
-  # Force system Python interpreter for this playbook
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-
   tasks:
-    - name: Verify current Python interpreter
-      debug:
-        var: ansible_python_interpreter
-
-    - name: Update all packages (security updates)
-      dnf:
-        name: '*'
+    - name: Update all packages
+      yum:
+        name: "*"
         state: latest
-        security: yes
-        update_cache: yes
-      register: update_result
-      async: 3600
-      poll: 0
-
-    - name: Wait for package updates to complete
-      async_status:
-        jid: "{{ update_result.ansible_job_id }}"
-      register: job_result
-      until: job_result.finished
-      retries: 30
-      delay: 60
-      ignore_errors: yes
-
-    - name: Install Python 3.11 (optional)
-      dnf:
-        name:
-          - python3.11
-          - python3.11-devel
-        state: present
-      when: install_python311 | default(false)
-
-    - name: Verify system Python is working with DNF
-      command: /usr/bin/python3 -c "import dnf; print(dnf.__version__)"
-      register: dnf_check
-      changed_when: false
-      failed_when: false
-
-    - name: Show DNF module status
-      debug:
-        var: dnf_check
+      when: ansible_distribution == "OracleLinux"
+      
+    - name: Reboot if required
+      reboot:
+        reboot_timeout: 3600
+      when: ansible_distribution == "OracleLinux"
