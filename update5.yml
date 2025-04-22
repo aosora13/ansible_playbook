@@ -1,75 +1,15 @@
 ---
-- name: Oracle Linux System Management
+- name: Update Oracle VM Servers
   hosts: oracle
-  gather_facts: false  # We'll gather facts manually after Python check
-  become: true
-  become_method: sudo
-
+  become: yes
   tasks:
-    # 1. First ensure Python is working
-    - name: Verify Python availability
-      raw: |
-        python3 -c 'import json; print(json.dumps({"python": "working"}))' || 
-        python -c 'import json; print(json.dumps({"python": "working"}))'
-      register: python_test
-      changed_when: false
-      ignore_errors: yes
-
-    # 2. Install Python if missing (without using facts)
-    - name: Install Python 3 (Oracle Linux)
-      raw: |
-        if [ -f /etc/oracle-release ]; then
-          if grep -q 'release 8' /etc/oracle-release; then
-            sudo dnf install -y python39
-            sudo alternatives --set python /usr/bin/python3
-          elif grep -q 'release 7' /etc/oracle-release; then
-            sudo yum install -y python3
-          fi
-        else
-          echo "Not an Oracle Linux system"
-          exit 1
-        fi
-      when: python_test.failed
-      args:
-        executable: /bin/bash
-
-    # 3. Now gather facts manually
-    - name: Gather system facts
-      setup:
-
-    # 4. Set package manager based on gathered facts
-    - name: Set package manager variable
-      set_fact:
-        ansible_pkg_mgr: "{{ 'dnf' if ansible_distribution_major_version == '8' else 'yum' }}"
-      when: 
-        - ansible_distribution is defined
-        - ansible_distribution == 'OracleLinux'
-
-    # 5. Fallback package manager detection if facts failed
-    - name: Detect package manager (fallback)
-      raw: |
-        if command -v dnf >/dev/null; then
-          echo 'dnf'
-        elif command -v yum >/dev/null; then
-          echo 'yum'
-        else
-          echo 'unknown'
-          exit 1
-        fi
-      register: pkg_mgr_fallback
-      when: ansible_distribution is not defined
-      changed_when: false
-
-    - name: Set fallback package manager
-      set_fact:
-        ansible_pkg_mgr: "{{ pkg_mgr_fallback.stdout }}"
-      when: pkg_mgr_fallback is defined
-
-    # 6. Now run your package operations
     - name: Update all packages
-      package:
-        name: '*'
+      yum:
+        name: "*"
         state: latest
-      vars:
-        ansible_pkg_mgr: "{{ ansible_pkg_mgr | default('dnf') }}"
-      when: ansible_pkg_mgr is defined
+      when: ansible_distribution == "OracleLinux"
+      
+    - name: Reboot if required
+      reboot:
+        reboot_timeout: 3600
+      when: ansible_distribution == "OracleLinux"
