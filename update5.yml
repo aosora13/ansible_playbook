@@ -1,4 +1,3 @@
-
 ---
 - name: Update system packages and configure Python interpreter
   hosts: oracle
