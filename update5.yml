@@ -2,7 +2,12 @@
 - name: Update Oracle VM Servers
   hosts: oracle
   become: yes
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
   tasks:
+    - name: Verify current Python interpreter
+      debug:
+        var: ansible_python_interpreter
     - name: Update all packages
       yum:
         name: "*"
