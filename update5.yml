@@ -5,7 +5,7 @@
   
   tasks:
     - name: Update all packages
-      dnf:
+      yum:
         name: "*"
         state: latest
       when: ansible_distribution == "OracleLinux"
