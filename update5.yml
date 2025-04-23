@@ -8,9 +8,10 @@
       yum:
         name: "*"
         state: latest
-      when: ansible_distribution == "OracleLinux"
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
       
     - name: Reboot if required
       reboot:
         reboot_timeout: 3600
-      when: ansible_distribution == "OracleLinux"
+      
