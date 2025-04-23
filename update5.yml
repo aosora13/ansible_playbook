@@ -2,7 +2,8 @@
 - name: Update Oracle VM Servers
   hosts: oracle
   become: yes
-  
+  # originally would like Python to be used for updates but had to remove with Oracle Linux VM would need to fix this in the future
+  # by pointing python 3.6 to python 3.9 but would have direct commands to just run the updates
   tasks:
     - name: Update all packages
       command: dnf update -y
