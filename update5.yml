@@ -5,11 +5,10 @@
   
   tasks:
     - name: Update all packages
-      yum:
-        name: "*"
-        state: latest
-      vars:
-        ansible_python_interpreter: /usr/bin/python3.6
+      command: dnf update -y
+      register: dnf_update
+      changed_when: "No'No packages marked for update' not in dnf_update.stdout"
+      
       
     - name: Reboot if required
       reboot:
