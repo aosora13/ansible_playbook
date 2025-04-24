@@ -1,13 +1,23 @@
 ---
-- name: Simple package update
+- name: Comprehensive package update
   hosts: oracle
   become: true
 
   tasks:
-    - name: Update all packages (simple)
-      dnf:
-        name: '*'
-        state: latest
-        update_cache: yes
-      register: update_result
-      changed_when: update_result.stdout != ""
+    - name: Clean package cache
+      command: dnf clean all
+      args:
+        executable: /bin/bash
+
+    - name: Update all packages
+      command: dnf update -y
+      register: dnf_update
+      changed_when: "'Nothing to do' not in dnf_update.stdout"
+      args:
+        executable: /bin/bash
+
+    - name: Remove unused packages
+      command: dnf autoremove -y
+      args:
+        executable: /bin/bash
+      when: "'Nothing to do' not in dnf_update.stdout"
