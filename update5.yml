@@ -1,23 +1,40 @@
 ---
-- name: Comprehensive package update
+- name: Oracle Linux Package Management
   hosts: oracle
   become: true
+  # Explicitly set Python interpreter to avoid discovery warnings
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
 
   tasks:
     - name: Clean package cache
-      command: dnf clean all
-      args:
-        executable: /bin/bash
+      ansible.builtin.command: >
+        /usr/bin/dnf clean all
+      changed_when: false  # This doesn't count as a "change"
 
-    - name: Update all packages
-      command: dnf update -y
-      register: dnf_update
-      changed_when: "'Nothing to do' not in dnf_update.stdout"
-      args:
-        executable: /bin/bash
+    - name: Check for available updates
+      ansible.builtin.command: >
+        /usr/bin/dnf check-update
+      register: updates_available
+      ignore_errors: true  # Returns non-zero when updates exist
+      changed_when: false
+
+    - name: Apply system updates
+      ansible.builtin.command: >
+        /usr/bin/dnf update -y
+      when: updates_available.rc == 100
+      register: system_update
+      # Only show as changed if the update actually did something
+      changed_when: >
+        "'Nothing to do' not in system_update.stdout"
 
     - name: Remove unused packages
-      command: dnf autoremove -y
-      args:
-        executable: /bin/bash
-      when: "'Nothing to do' not in dnf_update.stdout"
+      ansible.builtin.command: >
+        /usr/bin/dnf autoremove -y
+      when: updates_available.rc == 100
+      changed_when: false
+
+    - name: Show update summary
+      ansible.builtin.debug:
+        msg: "System was already up-to-date"
+      when: updates_available.rc == 0
