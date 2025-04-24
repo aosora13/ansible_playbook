@@ -1,40 +1,58 @@
 ---
-- name: Oracle Linux Package Management
+- name: Oracle Linux ARM System Maintenance
   hosts: oracle
+  # Disable automatic fact gathering to prevent Python conflicts
+  gather_facts: false
   become: true
-  # Explicitly set Python interpreter to avoid discovery warnings
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
 
   tasks:
-    - name: Clean package cache
-      ansible.builtin.command: >
-        /usr/bin/dnf clean all
-      changed_when: false  # This doesn't count as a "change"
+    # 1. First ensure proper Python is available
+    - name: Verify Python 3 availability
+      ansible.builtin.raw: |
+        python3 -c 'import sys; print(sys.version_info.major)' || 
+        python -c 'import sys; print(sys.version_info.major)'
+      register: python_check
+      changed_when: false
+      ignore_errors: true
 
+    # 2. Install Python 3 if missing (Oracle Linux ARM specific)
+    - name: Install Python 3
+      ansible.builtin.raw: |
+        if ! command -v python3 >/dev/null; then
+          if grep -q 'release 8' /etc/oracle-release; then
+            sudo dnf install -y python39 python3-dnf
+            sudo alternatives --set python /usr/bin/python3
+          elif grep -q 'release 7' /etc/oracle-release; then
+            sudo yum install -y python36 python3-libdnf
+          fi
+        fi
+      when: python_check.failed
+      args:
+        executable: /bin/bash
+
+    # 3. Manually set Python interpreter path
+    - name: Set Python interpreter fact
+      ansible.builtin.set_fact:
+        ansible_python_interpreter: "/usr/bin/python3"
+
+    # 4. Now run package updates (direct command approach)
     - name: Check for available updates
-      ansible.builtin.command: >
-        /usr/bin/dnf check-update
+      ansible.builtin.command: /usr/bin/dnf check-update
       register: updates_available
-      ignore_errors: true  # Returns non-zero when updates exist
+      ignore_errors: true  # Returns 100 when updates exist
       changed_when: false
 
     - name: Apply system updates
-      ansible.builtin.command: >
-        /usr/bin/dnf update -y
+      ansible.builtin.command: /usr/bin/dnf update -y
       when: updates_available.rc == 100
       register: system_update
-      # Only show as changed if the update actually did something
-      changed_when: >
-        "'Nothing to do' not in system_update.stdout"
+      changed_when: "'Nothing to do' not in system_update.stdout"
 
-    - name: Remove unused packages
-      ansible.builtin.command: >
-        /usr/bin/dnf autoremove -y
+    - name: Clean up packages
+      ansible.builtin.command: /usr/bin/dnf autoremove -y
       when: updates_available.rc == 100
       changed_when: false
 
-    - name: Show update summary
+    - name: System status
       ansible.builtin.debug:
-        msg: "System was already up-to-date"
-      when: updates_available.rc == 0
+        msg: "{{ 'Updates were applied' if updates_available.rc == 100 else 'System was already up-to-date' }}"
